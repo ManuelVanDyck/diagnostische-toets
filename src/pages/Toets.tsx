@@ -96,6 +96,11 @@ export default function Toets() {
       const gegeven = parseFloat(gekozenAntwoord.replace(',', '.'))
       const juist = parseFloat(huidigeVraag.juist_antwoord)
       isCorrect = !isNaN(gegeven) && !isNaN(juist) && Math.abs(gegeven - juist) <= tolerantie
+    } else if (huidigeVraag.type === 'meerkeuze_meervoudig') {
+      // Sorteer beide sets alfabetisch en vergelijk
+      const gegeven = gekozenAntwoord.split(',').map(s => s.trim()).filter(s => s).sort().join(',')
+      const juist = huidigeVraag.juist_antwoord.split(',').map(s => s.trim()).sort().join(',')
+      isCorrect = gegeven === juist
     } else {
       isCorrect = gekozenAntwoord.trim() === huidigeVraag.juist_antwoord.trim()
     }
@@ -219,6 +224,48 @@ export default function Toets() {
                         disabled={antwoordStatus !== 'kies'}
                         className={`w-full text-left p-4 rounded-xl border-2 transition ${knopKleur}`}
                       >
+                        <span dangerouslySetInnerHTML={{ __html: renderKatex(keuze.label) }} />
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Meerkeuze meervoudig */}
+              {huidigeVraag.type === 'meerkeuze_meervoudig' && huidigeVraag.keuzes_json && (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-500 mb-2">Selecteer alle juiste uitspraken:</p>
+                  {huidigeVraag.keuzes_json.map((keuze, i) => {
+                    const geselecteerd = gekozenAntwoord.split(',').includes(keuze.waarde)
+                    const juisteSet = huidigeVraag.juist_antwoord.split(',').map(s => s.trim())
+                    const isJuist = juisteSet.includes(keuze.waarde)
+                    let knopKleur = 'border-gray-200 hover:border-indigo-400'
+                    if (antwoordStatus === 'feedback') {
+                      if (isJuist && geselecteerd) knopKleur = 'border-green-400 bg-green-50'
+                      else if (isJuist && !geselecteerd) knopKleur = 'border-yellow-400 bg-yellow-50'
+                      else if (!isJuist && geselecteerd) knopKleur = 'border-red-400 bg-red-50'
+                    } else if (geselecteerd) {
+                      knopKleur = 'border-indigo-400 bg-indigo-50'
+                    }
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          if (antwoordStatus !== 'kies') return
+                          const huidig = gekozenAntwoord.split(',').filter(s => s)
+                          const nieuw = huidig.includes(keuze.waarde)
+                            ? huidig.filter(s => s !== keuze.waarde)
+                            : [...huidig, keuze.waarde]
+                          setGekozenAntwoord(nieuw.join(','))
+                        }}
+                        disabled={antwoordStatus !== 'kies'}
+                        className={`w-full text-left p-4 rounded-xl border-2 transition flex items-center gap-3 ${knopKleur}`}
+                      >
+                        <span className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center text-xs font-bold ${
+                          geselecteerd ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-gray-300'
+                        }`}>
+                          {geselecteerd ? '✓' : ''}
+                        </span>
                         <span dangerouslySetInnerHTML={{ __html: renderKatex(keuze.label) }} />
                       </button>
                     )
