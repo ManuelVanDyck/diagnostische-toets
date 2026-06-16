@@ -12,6 +12,10 @@
 ALTER TABLE toets_sessies DROP COLUMN IF EXISTS deel;
 ALTER TABLE toets_sessies ADD COLUMN IF NOT EXISTS gebied TEXT CHECK (gebied IN ('A','B','C','D','E','F','G'));
 
+-- Stap 1b: Maak deel-kolom op vragen optioneel (niet meer gebruikt in per-gebied model)
+ALTER TABLE vragen ALTER COLUMN deel DROP NOT NULL;
+ALTER TABLE vragen ALTER COLUMN deel SET DEFAULT NULL;
+
 -- ============================================================================
 -- Stap 2: Nieuwe volgende_vraag() — bottom-up adaptief
 -- Logica:
