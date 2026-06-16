@@ -43,7 +43,7 @@ function AppContent() {
   return (
     <Routes>
       <Route path="/" element={<Dashboard />} />
-      <Route path="/toets/:deel" element={<Toets />} />
+      <Route path="/toets/:gebied" element={<Toets />} />
       <Route path="/resultaat/:sessieId" element={<Resultaat />} />
       <Route path="/leerkracht" element={<LeerkrachtDashboard />} />
       <Route path="*" element={<Navigate to="/" replace />} />
