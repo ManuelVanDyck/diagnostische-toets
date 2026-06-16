@@ -10,7 +10,7 @@ const GEBIED_NAMEN: Record<string, string> = {
 }
 
 interface Vraag {
-  id: string; gebied: string; niveau: number
+  id: string; gebied: string; niveau: number; leerplandoel: string
   type: 'meerkeuze' | 'invul' | 'meerkeuze_meervoudig'
   vraag_html: string
   keuzes_json: { label: string; waarde: string }[] | null
@@ -97,14 +97,14 @@ export default function Toets() {
       const juist = parseFloat(huidigeVraag.juist_antwoord)
       isCorrect = !isNaN(gegeven) && !isNaN(juist) && Math.abs(gegeven - juist) <= tolerantie
     } else {
-      isCorrect = gekozeneAntwoord.trim() === huidigeVraag.juist_antwoord.trim()
+      isCorrect = gekozenAntwoord.trim() === huidigeVraag.juist_antwoord.trim()
     }
 
     await supabase.from('antwoorden').insert({
       sessie_id: sessieId,
       vraag_id: huidigeVraag.id,
       gebied,
-      gegeven_antwoord: gekozeneAntwoord,
+      gegeven_antwoord: gekozenAntwoord,
       is_correct: isCorrect,
       stap,
     })
@@ -208,8 +208,8 @@ export default function Toets() {
                     let knopKleur = 'border-gray-200 hover:border-indigo-400 hover:bg-indigo-50'
                     if (antwoordStatus === 'feedback') {
                       if (isJuist) knopKleur = 'border-green-400 bg-green-50'
-                      else if (keuze.waarde === gekozeneAntwoord) knopKleur = 'border-red-400 bg-red-50'
-                    } else if (keuze.waarde === gekozeneAntwoord) {
+                      else if (keuze.waarde === gekozenAntwoord) knopKleur = 'border-red-400 bg-red-50'
+                    } else if (keuze.waarde === gekozenAntwoord) {
                       knopKleur = 'border-indigo-400 bg-indigo-50'
                     }
                     return (
