@@ -262,7 +262,7 @@ export default function LeerkrachtDashboard() {
               <div key={g} className="text-center p-2 rounded-xl bg-gray-50">
                 <div className="text-xs text-gray-500">{g}</div>
                 <div className="font-bold text-lg text-gray-800">{gemiddelden[g]}</div>
-                <div className="text-xs text-gray-400">/3</div>
+                <div className="text-xs text-gray-400">/5</div>
               </div>
             ))}
           </div>

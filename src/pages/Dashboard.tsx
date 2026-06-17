@@ -156,7 +156,7 @@ export default function Dashboard() {
                     <div>
                       {v.status === 'afgerond' && v.niveau !== undefined && (
                         <span className={`text-xs font-bold px-2 py-1 rounded-lg ${NIVEAU_KLEUR[v.niveau]}`}>
-                          Niveau {v.niveau}/3
+                          Niveau {v.niveau}/5
                         </span>
                       )}
                       {v.status === 'bezig' && (

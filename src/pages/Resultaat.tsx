@@ -88,7 +88,7 @@ export default function Resultaat() {
         {/* Niveau indicator */}
         <div className={`rounded-2xl border-2 p-6 mb-6 ${info.kleur} text-center`}>
           <span className="text-5xl mb-2 block">{info.emoji}</span>
-          <p className="text-2xl font-bold">Niveau {resultaat.beheersingsniveau}/3</p>
+          <p className="text-2xl font-bold">Niveau {resultaat.beheersingsniveau}/5</p>
           <p className="text-sm mt-1">{info.label}</p>
           <p className="text-xs mt-2 opacity-75">{info.advies}</p>
         </div>
