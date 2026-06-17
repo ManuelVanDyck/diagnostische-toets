@@ -13,8 +13,10 @@ const GEBIED_NAMEN: Record<string, string> = {
 const NIVEAU_INFO: Record<number, { kleur: string; label: string; bg: string }> = {
   0: { kleur: '#DC2626', label: '0', bg: 'bg-red-50 text-red-700' },
   1: { kleur: '#EA580C', label: '1', bg: 'bg-orange-50 text-orange-700' },
-  2: { kleur: '#CA8A04', label: '2', bg: 'bg-yellow-50 text-yellow-700' },
-  3: { kleur: '#16A34A', label: '3', bg: 'bg-green-50 text-green-700' },
+  2: { kleur: '#CA8A04', label: '2', bg: 'bg-amber-50 text-amber-700' },
+  3: { kleur: '#65A30D', label: '3', bg: 'bg-lime-50 text-lime-700' },
+  4: { kleur: '#059669', label: '4', bg: 'bg-emerald-50 text-emerald-700' },
+  5: { kleur: '#4F46E5', label: '5', bg: 'bg-indigo-50 text-indigo-700' },
 }
 
 interface LeerlingResultaat {

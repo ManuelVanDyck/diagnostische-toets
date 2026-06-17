@@ -3,10 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const NIVEAU_INFO: Record<number, { kleur: string; label: string; emoji: string; advies: string }> = {
-  0: { kleur: 'bg-red-50 text-red-800 border-red-300', label: 'Onvoldoende basis', emoji: '🔴', advies: 'Begin met de basisoefeningen uit jaar 1–2.' },
-  1: { kleur: 'bg-orange-50 text-orange-800 border-orange-300', label: 'Basis aanwezig, toepassing zwak', emoji: '🟠', advies: 'Je kent de begrippen maar hebt moeite met toepassen. Oefen verder.' },
-  2: { kleur: 'bg-yellow-50 text-yellow-800 border-yellow-300', label: 'Voldoende, analyse ontbreekt', emoji: '🟡', advies: 'Je beheerst de standaardbewerkingen. Werk aan complexere vraagstukken.' },
-  3: { kleur: 'bg-green-50 text-green-800 border-green-300', label: 'Goed tot gevorderd', emoji: '🟢', advies: 'Je beheerst dit gebied uitstekend. Ga zo door!' },
+  0: { kleur: 'bg-red-50 text-red-800 border-red-300', label: 'Onvoldoende basis', emoji: '🔴', advies: 'Begin met de basisoefeningen uit jaar 1.' },
+  1: { kleur: 'bg-orange-50 text-orange-800 border-orange-300', label: 'Basisbegrip aanwezig', emoji: '🟠', advies: 'Je herkent de basisbegrippen. Oefen op eenvoudige toepassingen.' },
+  2: { kleur: 'bg-amber-50 text-amber-800 border-amber-300', label: 'Eenvoudige toepassing', emoji: '🟡', advies: 'Je kunt eenvoudige opgaven maken. Bouw verder aan standaardprocedures.' },
+  3: { kleur: 'bg-lime-50 text-lime-800 border-lime-300', label: 'Standaard toepassing', emoji: '🟢', advies: 'Je beheerst de standaardbewerkingen. Werk aan complexere opgaven.' },
+  4: { kleur: 'bg-emerald-50 text-emerald-800 border-emerald-300', label: 'Analyse & combinatie', emoji: '🔵', advies: 'Je kunt verbanden leggen en meerdere stappen combineren. Uitstekend!' },
+  5: { kleur: 'bg-indigo-50 text-indigo-800 border-indigo-300', label: 'Inzicht & redeneren', emoji: '🟣', advies: 'Je hebt diep inzicht en kunt zelfstandig redeneren. Topniveau!' },
 }
 
 const GEBIED_NAMEN: Record<string, string> = {
