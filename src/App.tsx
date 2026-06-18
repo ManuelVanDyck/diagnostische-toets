@@ -62,10 +62,13 @@ async function syncRol(userId: string) {
 
   let rol = gekozenRol
   if (rol === 'leerkracht') {
-    // Check of dit e-mailadres in de whitelist staat
-    const { data: allowed } = await supabase.rpc('is_leerkracht_allowed', { p_email: email })
-    if (!allowed) {
-      console.warn(`Leerkracht-toegang geweigerd voor ${email}`)
+    try {
+      const { data: allowed, error: rpcError } = await supabase.rpc('is_leerkracht_allowed', { p_email: email })
+      if (rpcError || !allowed) {
+        console.warn(`Leerkracht-toegang geweigerd voor ${email}`)
+        rol = 'leerling'
+      }
+    } catch {
       rol = 'leerling'
     }
   }
