@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { renderKatex } from '../lib/katex-utils'
+import { GEBIED_FEEDBACK } from '../lib/feedback'
 
 const GEBIEDEN = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
 const GEBIED_NAMEN: Record<string, string> = {
@@ -157,18 +158,26 @@ export default function LeerkrachtDashboard() {
           </h2>
           <p className="text-gray-500 mb-6">Klas {selectedLeerling.klas}</p>
 
-          {/* Per gebied */}
+          {/* Per gebied met feedback */}
           <div className="space-y-3 mb-6">
             {GEBIEDEN.map(g => {
               const gData = selectedLeerling.gebieden[g]
               if (!gData) return null
               const info = NIVEAU_INFO[gData.niveau]
+              const fb = GEBIED_FEEDBACK[g]?.[gData.niveau]
               return (
-                <div key={g} className={`rounded-xl border p-4 ${info.bg}`}>
-                  <div className="flex justify-between items-center">
+                <div key={g} className={`rounded-xl border-2 p-4 ${info.bg}`}>
+                  <div className="flex justify-between items-center mb-2">
                     <span className="font-semibold">{g}: {GEBIED_NAMEN[g]}</span>
                     <span>Niveau {info.label} — {gData.correct}/{gData.totaal} correct</span>
                   </div>
+                  {fb && (
+                    <div className="mt-2 pt-2 border-t border-gray-200/50 text-xs space-y-1">
+                      <p><span className="font-medium">✅ Kan:</span> {fb.kan}</p>
+                      <p><span className="font-medium">📋 Beheerst:</span> {fb.beheerst}</p>
+                      <p><span className="font-medium">🎯 Werk aan:</span> {fb.werk_aan}</p>
+                    </div>
+                  )}
                 </div>
               )
             })}
