@@ -113,24 +113,41 @@ export default function LeerkrachtDashboard() {
     setDetailAntwoorden(data || [])
   }
 
-  // CSV export
+  // CSV export met feedback
   const exportCSV = () => {
-    const headers = ['Voornaam', 'Naam', 'Klas', ...GEBIEDEN.map(g => `${g} (niveau)`), 'Gemiddeld']
-    const rows = resultaten.map(lr => {
-      const niveaus = GEBIEDEN.map(g => lr.gebieden[g]?.niveau ?? '-')
-      const gem = GEBIEDEN
-        .map(g => lr.gebieden[g]?.niveau)
-        .filter(n => n !== undefined) as number[]
-      const gemiddeld = gem.length > 0 ? (gem.reduce((a,b) => a+b, 0) / gem.length).toFixed(1) : '-'
-      return [lr.voornaam, lr.naam, lr.klas, ...niveaus, gemiddeld]
+    const headers = ['Voornaam', 'Naam', 'Klas', 
+      ...GEBIEDEN.flatMap(g => [`${g} (niveau)`, `${g} (correct)`, `${g} (feedback)`]), 
+      'Gemiddeld']
+    const rows = gefilterd.map(lr => {
+      const gebiedenData = GEBIEDEN.flatMap(g => {
+        const d = lr.gebieden[g]
+        const fb = d ? GEBIED_FEEDBACK[g]?.[d.niveau] : null
+        return [
+          d?.niveau ?? '-',
+          d ? `${d.correct}/${d.totaal}` : '-',
+          fb ? fb.werk_aan.replace(/,/g, ' -') : '-'
+        ]
+      })
+      const niveaus = GEBIEDEN.map(g => lr.gebieden[g]?.niveau).filter(n => n !== undefined) as number[]
+      const gem = niveaus.length > 0 ? (niveaus.reduce((a,b) => a+b, 0) / niveaus.length).toFixed(1) : '-'
+      return [lr.voornaam, lr.naam, lr.klas, ...gebiedenData, gem]
     })
-    const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
+    const csv = '\uFEFF' + [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = 'diagnostische-toets-resultaten.csv'; a.click()
+    a.href = url; a.download = `diagnostische-toets-${klasFilter || 'alle'}.csv`; a.click()
     URL.revokeObjectURL(url)
   }
+
+  // Print-weergave
+  const [printModus, setPrintModus] = useState(false)
+  const printKlasOverzicht = () => {
+    setPrintModus(true)
+    setTimeout(() => window.print(), 300)
+  }
+
+  if (printModus) return <PrintOverzicht resultaten={gefilterd} klas={klasFilter} onClose={() => setPrintModus(false)} />
 
   // Filter
   const klassen = [...new Set(resultaten.map(r => r.klas))]
@@ -243,6 +260,9 @@ export default function LeerkrachtDashboard() {
             <button onClick={exportCSV} className="px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-sm font-medium">
               📥 CSV
             </button>
+            <button onClick={printKlasOverzicht} className="px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-sm font-medium">
+              🖨️ Print
+            </button>
             <button onClick={() => navigate('/')} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">
               ← Start
             </button>
@@ -349,6 +369,62 @@ export default function LeerkrachtDashboard() {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Print-vriendelijk overzicht per klas
+function PrintOverzicht({ resultaten, klas, onClose }: { resultaten: LeerlingResultaat[], klas: string, onClose: () => void }) {
+  const titel = klas ? `Klas ${klas}` : 'Alle klassen'
+  return (
+    <div className="p-6 max-w-[210mm] mx-auto print:p-0 print:max-w-none bg-white min-h-screen">
+      <div className="flex justify-between items-center mb-6 print:hidden">
+        <h1 className="text-xl font-bold">🖨️ Printweergave — {titel}</h1>
+        <div className="flex gap-2">
+          <button onClick={() => window.print()} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium">
+            🖨️ Afdrukken
+          </button>
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-500">← Terug</button>
+        </div>
+      </div>
+
+      <h1 className="text-xl font-bold mb-1 hidden print:block">Diagnostische Toets Wiskunde — {titel}</h1>
+      <p className="text-gray-500 text-sm mb-4 hidden print:block">{resultaten.length} leerlingen · {new Date().toLocaleDateString('nl-BE')}</p>
+
+      {resultaten.map((lr, i) => (
+        <div key={lr.leerling_id} className={`mb-6 pb-4 ${i < resultaten.length - 1 ? 'border-b border-gray-200' : ''}`}>
+          <h2 className="font-bold text-gray-800 mb-3">
+            {lr.voornaam} {lr.naam} {lr.klas && <span className="text-gray-500 font-normal">· {lr.klas}</span>}
+          </h2>
+          <div className="grid grid-cols-1 gap-2 print:grid-cols-2 print:gap-1">
+            {GEBIEDEN.map(g => {
+              const d = lr.gebieden[g]
+              if (!d) return null
+              const info = NIVEAU_INFO[d.niveau]
+              const fb = GEBIED_FEEDBACK[g]?.[d.niveau]
+              return (
+                <div key={g} className={`rounded-lg border p-2 text-xs ${info.bg} print:text-[9px] print:p-1`}>
+                  <div className="flex justify-between font-semibold mb-1">
+                    <span>{g}: {GEBIED_NAMEN[g]}</span>
+                    <span>Niv {info.label} ({d.correct}/{d.totaal})</span>
+                  </div>
+                  {fb && (
+                    <div className="space-y-0.5 text-[10px] print:text-[7px]">
+                      <div>✅ {fb.kan}</div>
+                      <div>📋 {fb.beheerst}</div>
+                      <div>🎯 {fb.werk_aan}</div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+
+      {resultaten.length === 0 && (
+        <p className="text-gray-500 text-center py-8">Geen resultaten beschikbaar.</p>
+      )}
     </div>
   )
 }
