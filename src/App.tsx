@@ -53,27 +53,34 @@ function AppContent() {
 
 /** Na Google OAuth login: lees de gekozen rol uit localStorage en update de database */
 async function syncRol(userId: string) {
-  const rol = localStorage.getItem(ROL_KEY)
-  if (!rol || (rol !== 'leerling' && rol !== 'leerkracht')) return
+  const gekozenRol = localStorage.getItem(ROL_KEY)
+  if (!gekozenRol || (gekozenRol !== 'leerling' && gekozenRol !== 'leerkracht')) return
+
+  // Haal het e-mailadres van de ingelogde gebruiker op
+  const { data: { user } } = await supabase.auth.getUser()
+  const email = user?.email || ''
+
+  let rol = gekozenRol
+  if (rol === 'leerkracht') {
+    // Check of dit e-mailadres in de whitelist staat
+    const { data: allowed } = await supabase.rpc('is_leerkracht_allowed', { p_email: email })
+    if (!allowed) {
+      console.warn(`Leerkracht-toegang geweigerd voor ${email}`)
+      rol = 'leerling'
+    }
+  }
 
   try {
-    // Check of er al een leerlingen-record is
     const { data } = await supabase
       .from('leerlingen')
       .select('rol')
       .eq('id', userId)
       .single()
 
-    // Als het record nog de default 'leerling' heeft maar de gebruiker koos 'leerkracht'
     if (data && data.rol !== rol) {
-      await supabase
-        .from('leerlingen')
-        .update({ rol })
-        .eq('id', userId)
+      await supabase.from('leerlingen').update({ rol }).eq('id', userId)
     }
   } catch {
-    // Record bestaat mogelijk nog niet (trigger race condition)
-    // Probeer opnieuw na korte vertraging
     setTimeout(() => syncRol(userId), 1000)
   }
 }
