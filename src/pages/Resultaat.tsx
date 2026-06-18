@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { GEBIED_FEEDBACK } from '../lib/feedback'
 
 const NIVEAU_INFO: Record<number, { kleur: string; label: string; emoji: string; advies: string }> = {
   0: { kleur: 'bg-red-50 text-red-800 border-red-300', label: 'Onvoldoende basis', emoji: '🔴', advies: 'Begin met de basisoefeningen uit jaar 1.' },
@@ -113,6 +114,34 @@ export default function Resultaat() {
             {Math.round((resultaat.aantal_correct / Math.max(resultaat.aantal_vragen, 1)) * 100)}% correct
           </p>
         </div>
+
+        {/* Gedetailleerde feedback */}
+        {gebied && GEBIED_FEEDBACK[gebied]?.[resultaat.beheersingsniveau] && (
+          <div className="bg-white rounded-2xl shadow-sm p-6 mb-6 space-y-4">
+            <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Feedback</h3>
+            <div className="flex items-start gap-3">
+              <span className="text-green-500 text-lg mt-0.5">✅</span>
+              <div>
+                <p className="text-sm font-medium text-gray-700">Wat je al kan:</p>
+                <p className="text-sm text-gray-600">{GEBIED_FEEDBACK[gebied][resultaat.beheersingsniveau].kan}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-blue-500 text-lg mt-0.5">📋</span>
+              <div>
+                <p className="text-sm font-medium text-gray-700">Wat je beheerst:</p>
+                <p className="text-sm text-gray-600">{GEBIED_FEEDBACK[gebied][resultaat.beheersingsniveau].beheerst}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="text-amber-500 text-lg mt-0.5">🎯</span>
+              <div>
+                <p className="text-sm font-medium text-gray-700">Waar je nog aan kan werken:</p>
+                <p className="text-sm text-gray-600">{GEBIED_FEEDBACK[gebied][resultaat.beheersingsniveau].werk_aan}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <button
           onClick={() => navigate('/')}
