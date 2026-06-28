@@ -73,6 +73,11 @@ export default function Dashboard() {
   }
 
   const startToets = async (gebied: string) => {
+    // Gebied B heeft een aparte sub-gebied flow
+    if (gebied === 'B') {
+      navigate('/gebied-b')
+      return
+    }
     const user = (await supabase.auth.getUser()).data.user
     if (!user) return
 

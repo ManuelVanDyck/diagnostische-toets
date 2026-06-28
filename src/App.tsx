@@ -6,6 +6,8 @@ import Dashboard from './pages/Dashboard'
 import Toets from './pages/Toets'
 import Resultaat from './pages/Resultaat'
 import LeerkrachtDashboard from './pages/LeerkrachtDashboard'
+import GebiedBIntro from './components/GebiedBIntro'
+import GebiedBToets from './components/GebiedBToets'
 
 const ROL_KEY = 'diagnostische_toets_rol'
 
@@ -44,6 +46,8 @@ function AppContent() {
     <Routes>
       <Route path="/" element={<Dashboard />} />
       <Route path="/toets/:gebied" element={<Toets />} />
+      <Route path="/toets/B" element={<GebiedBToets />} />
+      <Route path="/gebied-b" element={<GebiedBIntro />} />
       <Route path="/resultaat/:sessieId" element={<Resultaat />} />
       <Route path="/leerkracht" element={<LeerkrachtDashboard />} />
       <Route path="*" element={<Navigate to="/" replace />} />

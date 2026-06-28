@@ -1,0 +1,307 @@
+import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
+import { renderKatex } from '../lib/katex-utils'
+import { SUBS } from './GebiedBIntro'
+import { GEBIED_FEEDBACK } from '../lib/feedback'
+
+interface Vraag { id: string; sub_gebied: string; niveau: number; type: string; vraag_html: string; keuzes_json: any; juist_antwoord: string; tolerantie: number | null; uitleg_html: string | null }
+
+export default function GebiedBToets() {
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const sessieId = searchParams.get('sessie')
+
+  const [huidigeVraag, setHuidigeVraag] = useState<Vraag | null>(null)
+  const [gekozenAntwoord, setGekozenAntwoord] = useState('')
+  const [antwoordStatus, setAntwoordStatus] = useState<'kies' | 'feedback'>('kies')
+  const [loading, setLoading] = useState(true)
+  
+  // Sub-gebied tracking: per sub houden we bij: actief, huidig niveau, of er al een fout is op dit niveau
+  const [subState, setSubState] = useState<Record<string, { actief: boolean; niveau: number; foutOpNiveau: boolean; klaar: boolean }>>({
+    eigenschappen: { actief: true, niveau: 1, foutOpNiveau: false, klaar: false },
+    volgorde: { actief: true, niveau: 1, foutOpNiveau: false, klaar: false },
+    machten: { actief: true, niveau: 1, foutOpNiveau: false, klaar: false },
+    wortels: { actief: true, niveau: 1, foutOpNiveau: false, klaar: false },
+  })
+  const [currentSubIdx, setCurrentSubIdx] = useState(0)
+  const [currentLevel, setCurrentLevel] = useState(1)
+  const [afgerond, setAfgerond] = useState(false)
+
+  const subKeys = ['eigenschappen', 'volgorde', 'machten', 'wortels']
+
+  // Laad eerste vraag
+  useEffect(() => { if (sessieId) laadVraag(subKeys[0], 1) }, [sessieId])
+
+  const laadVraag = async (sub: string, niveau: number) => {
+    setLoading(true)
+    const { data: vraagId } = await supabase.rpc('volgende_vraag_sub', {
+      p_sessie_id: sessieId, p_gebied: 'B', p_sub_gebied: sub
+    })
+    if (!vraagId) {
+      // Dit sub-gebied is klaar of heeft geen vragen meer
+      setSubState(prev => ({ ...prev, [sub]: { ...prev[sub], klaar: true } }))
+      moveToNext(sub)
+      return
+    }
+    const { data: vraag } = await supabase.from('vragen').select('*').eq('id', vraagId).single()
+    if (vraag) {
+      setHuidigeVraag(vraag)
+      setGekozenAntwoord('')
+      setAntwoordStatus('kies')
+    }
+    setLoading(false)
+  }
+
+  const verstuurAntwoord = async () => {
+    if (!sessieId || !huidigeVraag) return
+    let isCorrect = false
+    if (huidigeVraag.type === 'invul') {
+      const t = huidigeVraag.tolerantie || 0.001
+      const g = parseFloat(gekozenAntwoord.replace(',', '.'))
+      const j = parseFloat(huidigeVraag.juist_antwoord)
+      isCorrect = !isNaN(g) && !isNaN(j) && Math.abs(g - j) <= t
+    } else if (huidigeVraag.type === 'meerkeuze_meervoudig') {
+      const gegeven = gekozenAntwoord.split(',').map(s => s.trim()).filter(s => s).sort().join(',')
+      const juist = huidigeVraag.juist_antwoord.split(',').map(s => s.trim()).sort().join(',')
+      isCorrect = gegeven === juist
+    } else {
+      isCorrect = gekozenAntwoord.trim() === huidigeVraag.juist_antwoord.trim()
+    }
+
+    await supabase.from('antwoorden').insert({
+      sessie_id: sessieId, vraag_id: huidigeVraag.id, gebied: 'B',
+      gegeven_antwoord: gekozenAntwoord, is_correct: isCorrect, stap: currentLevel
+    })
+    setAntwoordStatus('feedback')
+  }
+
+  const volgendeVraag = async () => {
+    if (!huidigeVraag) return
+    const sub = huidigeVraag.sub_gebied
+
+    if (antwoordStatus !== 'feedback') return // veiligheid
+
+    // Check of laatste antwoord correct was
+    const { data: laatste } = await supabase
+      .from('antwoorden')
+      .select('is_correct')
+      .eq('sessie_id', sessieId)
+      .order('beantwoord_op', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (laatste?.is_correct) {
+      // Correct → ga naar volgende niveau voor dit sub
+      const newNiv = (subState[sub].niveau) + 1
+      if (newNiv > 5) {
+        setSubState(prev => ({ ...prev, [sub]: { ...prev[sub], klaar: true, niveau: newNiv - 1 } }))
+        moveToNext(sub)
+      } else {
+        setSubState(prev => ({ ...prev, [sub]: { ...prev[sub], niveau: newNiv, foutOpNiveau: false } }))
+        moveToNext(sub)
+      }
+    } else {
+      // Fout
+      if (subState[sub].foutOpNiveau) {
+        // 2e fout → sub stopt, noteer niveau-1
+        const eindNiv = subState[sub].niveau - 1
+        setSubState(prev => ({ ...prev, [sub]: { ...prev[sub], actief: false, klaar: true, niveau: Math.max(0, eindNiv) } }))
+        moveToNext(sub)
+      } else {
+        // Eerste fout → herkansing zelfde niveau
+        setSubState(prev => ({ ...prev, [sub]: { ...prev[sub], foutOpNiveau: true } }))
+        laadVraag(sub, subState[sub].niveau)
+      }
+    }
+  }
+
+  const moveToNext = async (fromSub: string) => {
+    const fromIdx = subKeys.indexOf(fromSub)
+    // Zoek volgende actieve sub
+    for (let i = fromIdx + 1; i < subKeys.length; i++) {
+      const s = subState[subKeys[i]]
+      if (s.actief && !s.klaar) {
+        setCurrentSubIdx(i)
+        laadVraag(subKeys[i], s.niveau)
+        return
+      }
+    }
+    // Alle subs in deze ronde gedaan → check of we naar volgend niveau gaan
+    const nogActief = subKeys.some(k => subState[k].actief && !subState[k].klaar)
+    if (!nogActief) {
+      voltooiToets()
+      return
+    }
+    // Start nieuwe ronde: deze subs hebben nog geen klaar-flag, reset foutOpNiveau
+    const newLvl = currentLevel + 1
+    setCurrentLevel(newLvl)
+    setSubState(prev => {
+      const updated = { ...prev }
+      for (const k of subKeys) {
+        if (updated[k].actief && !updated[k].klaar) {
+          updated[k] = { ...updated[k], niveau: newLvl, foutOpNiveau: false }
+        }
+      }
+      return updated
+    })
+    // Start met eerste actieve sub op nieuw niveau
+    for (const k of subKeys) {
+      if (subState[k].actief && !subState[k].klaar) {
+        laadVraag(k, newLvl)
+        return
+      }
+    }
+    voltooiToets()
+  }
+
+  const voltooiToets = async () => {
+    const user = (await supabase.auth.getUser()).data.user
+    if (!user || !sessieId) return
+
+    // Bereken niveau per sub en sla op
+    for (const sub of subKeys) {
+      const { data: niveau } = await supabase.rpc('bereken_niveau_sub', {
+        p_sessie_id: sessieId, p_gebied: 'B', p_sub_gebied: sub
+      })
+      const { count: tot } = await supabase.from('antwoorden')
+        .select('*', { count: 'exact', head: true })
+        .eq('sessie_id', sessieId)
+        .filter('vraag_id', 'in', `(SELECT id FROM vragen WHERE sub_gebied='${sub}')`)
+      const { count: cor } = await supabase.from('antwoorden')
+        .select('*', { count: 'exact', head: true })
+        .eq('sessie_id', sessieId).eq('is_correct', true)
+        .filter('vraag_id', 'in', `(SELECT id FROM vragen WHERE sub_gebied='${sub}')`)
+
+      await supabase.from('resultaten').upsert({
+        sessie_id: sessieId, leerling_id: user.id, gebied: 'B', sub_gebied: sub,
+        beheersingsniveau: niveau || 0, aantal_vragen: tot || 0, aantal_correct: cor || 0
+      }, { onConflict: 'sessie_id,sub_gebied' })
+    }
+
+    await supabase.from('toets_sessies').update({ status: 'afgerond', beeindigd_op: new Date().toISOString() }).eq('id', sessieId)
+    setAfgerond(true)
+  }
+
+  if (afgerond) return <GebiedBResultaat sessieId={sessieId!} subState={subState} />
+
+  if (loading && !huidigeVraag) {
+    return <div className="min-h-screen flex items-center justify-center text-gray-500">Vraag laden...</div>
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-3xl mx-auto">
+        {/* Progress bar */}
+        <div className="flex gap-1 mb-4">
+          {subKeys.map(k => {
+            const s = subState[k]
+            const subInfo = SUBS.find(x => x.key === k)
+            return (
+              <div key={k} className={`flex-1 h-2 rounded-full ${
+                s.klaar ? (s.niveau >= 3 ? 'bg-green-400' : s.niveau >= 1 ? 'bg-yellow-400' : 'bg-red-400')
+                : s.actief ? 'bg-indigo-400' : 'bg-gray-300'
+              }`} title={`${subInfo?.naam}: niv ${s.niveau}`} />
+            )
+          })}
+        </div>
+
+        {huidigeVraag && (
+          <div className="bg-white rounded-2xl shadow-lg p-6 mb-4">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+                {SUBS.find(s => s.key === huidigeVraag.sub_gebied)?.naam}
+              </span>
+              <span className="text-xs text-gray-400">Niveau {huidigeVraag.niveau}</span>
+            </div>
+
+            <div className="prose max-w-none text-gray-800 mb-6 text-lg"
+              dangerouslySetInnerHTML={{ __html: renderKatex(huidigeVraag.vraag_html) }} />
+
+            {huidigeVraag.type === 'meerkeuze' && huidigeVraag.keuzes_json && (
+              <div className="space-y-3">
+                {huidigeVraag.keuzes_json.map((keuze: any, i: number) => {
+                  const isJuist = keuze.waarde === huidigeVraag.juist_antwoord
+                  let knop = 'border-gray-200 hover:border-indigo-400 hover:bg-indigo-50'
+                  if (antwoordStatus === 'feedback') {
+                    if (isJuist) knop = 'border-green-400 bg-green-50'
+                    else if (keuze.waarde === gekozenAntwoord) knop = 'border-red-400 bg-red-50'
+                  } else if (keuze.waarde === gekozenAntwoord) knop = 'border-indigo-400 bg-indigo-50'
+                  return (
+                    <button key={i} onClick={() => antwoordStatus === 'kies' && setGekozenAntwoord(keuze.waarde)}
+                      disabled={antwoordStatus !== 'kies'}
+                      className={`w-full text-left p-4 rounded-xl border-2 transition ${knop}`}>
+                      <span dangerouslySetInnerHTML={{ __html: renderKatex(keuze.label) }} />
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            {huidigeVraag.type === 'invul' && (
+              <input type="text" value={gekozenAntwoord} onChange={e => setGekozenAntwoord(e.target.value)}
+                disabled={antwoordStatus !== 'kies'}
+                onKeyDown={e => e.key === 'Enter' && antwoordStatus === 'kies' && verstuurAntwoord()}
+                placeholder="Jouw antwoord..." className="w-full p-4 text-lg rounded-xl border-2 border-gray-200 focus:border-indigo-400 outline-none" autoFocus />
+            )}
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          {antwoordStatus === 'kies' && (
+            <button onClick={verstuurAntwoord} disabled={!gekozenAntwoord}
+              className="flex-1 py-3 px-6 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition font-medium disabled:opacity-50">
+              Antwoord controleren
+            </button>
+          )}
+          {antwoordStatus === 'feedback' && (
+            <button onClick={volgendeVraag}
+              className="flex-1 py-3 px-6 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition font-medium">
+              Volgende vraag →
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Resultaat component voor Gebied B
+function GebiedBResultaat({ sessieId, subState }: { sessieId: string, subState: any }) {
+  const navigate = useNavigate()
+  const [resultaten, setResultaten] = useState<any>(null)
+  const NIVEAU_EMOJI = ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣']
+  const NIVEAU_LABEL = ['Onvoldoende', 'Basis', 'Eenvoudig', 'Standaard', 'Analyse', 'Inzicht']
+
+  useEffect(() => {
+    supabase.from('resultaten').select('*').eq('sessie_id', sessieId).then(({ data }) => setResultaten(data))
+  }, [])
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-xl mx-auto">
+        <h1 className="text-2xl font-bold text-gray-800 mb-1">Jouw resultaat — Gebied B</h1>
+        <p className="text-gray-500 mb-6">Bewerkingen & Rekenregels</p>
+
+        {resultaten && resultaten.map((r: any) => {
+          const subInfo = SUBS.find(s => s.key === r.sub_gebied)
+          return (
+            <div key={r.sub_gebied} className="bg-white rounded-xl shadow-sm p-4 mb-3">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-semibold text-gray-800">{subInfo?.icon} {subInfo?.naam}</span>
+                <span className="text-2xl">{NIVEAU_EMOJI[r.beheersingsniveau]}</span>
+              </div>
+              <div className="flex justify-between text-sm text-gray-500">
+                <span>Niveau {r.beheersingsniveau}/5 — {NIVEAU_LABEL[r.beheersingsniveau]}</span>
+                <span>{r.aantal_correct}/{r.aantal_vragen} correct</span>
+              </div>
+            </div>
+          )
+        })}
+
+        <button onClick={() => navigate('/')} className="w-full mt-6 py-3 px-6 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition font-medium">
+          Terug naar overzicht
+        </button>
+      </div>
+    </div>
+  )
+}
