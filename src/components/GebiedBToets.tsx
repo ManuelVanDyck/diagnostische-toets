@@ -96,15 +96,9 @@ export default function GebiedBToets() {
       .single()
 
     if (laatste?.is_correct) {
-      // Correct → ga naar volgende niveau voor dit sub
-      const newNiv = (subState[sub].niveau) + 1
-      if (newNiv > 5) {
-        setSubState(prev => ({ ...prev, [sub]: { ...prev[sub], klaar: true, niveau: newNiv - 1 } }))
-        moveToNext(sub)
-      } else {
-        setSubState(prev => ({ ...prev, [sub]: { ...prev[sub], niveau: newNiv, foutOpNiveau: false } }))
-        moveToNext(sub)
-      }
+      // Correct → markeer dit sub als klaar voor dit niveau
+      setSubState(prev => ({ ...prev, [sub]: { ...prev[sub], klaar: true, foutOpNiveau: false } }))
+      moveToNext(sub)
     } else {
       // Fout
       if (subState[sub].foutOpNiveau) {
@@ -131,26 +125,28 @@ export default function GebiedBToets() {
       }
     }
     // Alle subs in deze ronde gedaan → check of we naar volgend niveau gaan
-    const nogActief = subKeys.some(k => subState[k].actief && !subState[k].klaar)
+    const nogActief = subKeys.some(k => subState[k].actief)
     if (!nogActief) {
       voltooiToets()
       return
     }
-    // Start nieuwe ronde: deze subs hebben nog geen klaar-flag, reset foutOpNiveau
+    // Start nieuwe ronde: reset klaar, verhoog niveau voor actieve subs
     const newLvl = currentLevel + 1
+    if (newLvl > 5) { voltooiToets(); return }
     setCurrentLevel(newLvl)
     setSubState(prev => {
       const updated = { ...prev }
       for (const k of subKeys) {
-        if (updated[k].actief && !updated[k].klaar) {
-          updated[k] = { ...updated[k], niveau: newLvl, foutOpNiveau: false }
+        if (updated[k].actief) {
+          // Reset klaar, verhoog niveau, reset fout
+          updated[k] = { ...updated[k], klaar: false, niveau: newLvl, foutOpNiveau: false }
         }
       }
       return updated
     })
     // Start met eerste actieve sub op nieuw niveau
     for (const k of subKeys) {
-      if (subState[k].actief && !subState[k].klaar) {
+      if (subState[k].actief) {
         laadVraag(k, newLvl)
         return
       }
