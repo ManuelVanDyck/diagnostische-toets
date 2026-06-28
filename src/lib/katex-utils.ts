@@ -2,8 +2,16 @@ import katex from 'katex'
 
 /** Render KaTeX string naar HTML — veilig voor dangerouslySetInnerHTML */
 export function renderKatex(tex: string): string {
+  let html = tex
+
+  // Auto-wrap: tekst met ^ of _ zonder $ → wrap in $
+  html = html.replace(/([a-zA-Z0-9)])\^(\{?[a-zA-Z0-9+\-·]+\}?)/g, (_: string, base: string, exp: string) => {
+    if (html.includes('$')) return `$${base}^${exp}$` // al in dollar, niet dubbel
+    return `$${base}^${exp}$`
+  })
+
   // Vervang $$...$$ door display math
-  let html = tex.replace(/\$\$(.+?)\$\$/gs, (_: string, formula: string) => {
+  html = html.replace(/\$\$(.+?)\$\$/gs, (_: string, formula: string) => {
     try {
       return katex.renderToString(formula.trim(), { displayMode: true, throwOnError: false })
     } catch {
