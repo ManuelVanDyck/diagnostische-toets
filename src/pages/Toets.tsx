@@ -297,7 +297,7 @@ export default function Toets() {
                 <span className="text-sm text-blue-800 font-mono" dangerouslySetInnerHTML={{ __html: renderKatex('$' + huidigeVraag.juist_antwoord + '$') }} />
               </div>
             )}
-          </div>
+          </>
 
             {/* Actieknoppen */}
             <div className="flex gap-3">
