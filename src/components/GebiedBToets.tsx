@@ -54,10 +54,17 @@ export default function GebiedBToets() {
     if (!sessieId || !huidigeVraag) return
     let isCorrect = false
     if (huidigeVraag.type === 'invul') {
-      const t = huidigeVraag.tolerantie || 0.001
-      const g = parseFloat(gekozenAntwoord.replace(',', '.'))
-      const j = parseFloat(huidigeVraag.juist_antwoord)
-      isCorrect = !isNaN(g) && !isNaN(j) && Math.abs(g - j) <= t
+      if (huidigeVraag.tolerantie === null || huidigeVraag.tolerantie === undefined) {
+        // Tekst-antwoord: exacte vergelijking (case-insensitive, zonder spaties)
+        const g = gekozenAntwoord.trim().replace(/\s+/g, '').toLowerCase()
+        const j = huidigeVraag.juist_antwoord.trim().replace(/\s+/g, '').toLowerCase()
+        isCorrect = g === j
+      } else {
+        const t = huidigeVraag.tolerantie || 0.001
+        const g = parseFloat(gekozenAntwoord.replace(',', '.'))
+        const j = parseFloat(huidigeVraag.juist_antwoord)
+        isCorrect = !isNaN(g) && !isNaN(j) && Math.abs(g - j) <= t
+      }
     } else if (huidigeVraag.type === 'meerkeuze_meervoudig') {
       const gegeven = gekozenAntwoord.split(',').map(s => s.trim()).filter(s => s).sort().join(',')
       const juist = huidigeVraag.juist_antwoord.split(',').map(s => s.trim()).sort().join(',')
