@@ -4,11 +4,10 @@ import katex from 'katex'
 export function renderKatex(tex: string): string {
   let html = tex
 
-  // Auto-wrap: tekst met ^ of _ zonder $ → wrap in $
-  html = html.replace(/([a-zA-Z0-9)])\^(\{?[a-zA-Z0-9+\-·]+\}?)/g, (_: string, base: string, exp: string) => {
-    if (html.includes('$')) return `$${base}^${exp}$` // al in dollar, niet dubbel
-    return `$${base}^${exp}$`
-  })
+  // Auto-wrap: als de tekst ^ of _ bevat maar geen $, wrap dan in $...$
+  if (!html.includes('$') && /[\^_]/.test(html)) {
+    html = `$${html}$`
+  }
 
   // Vervang $$...$$ door display math
   html = html.replace(/\$\$(.+?)\$\$/gs, (_: string, formula: string) => {
