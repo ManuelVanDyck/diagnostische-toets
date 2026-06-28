@@ -240,6 +240,35 @@ export default function GebiedBToets() {
                 placeholder="Jouw antwoord..." className="w-full p-4 text-lg rounded-xl border-2 border-gray-200 focus:border-indigo-400 outline-none" autoFocus />
             )}
 
+            {/* Meerkeuze meervoudig */}
+            {huidigeVraag.type === 'meerkeuze_meervoudig' && huidigeVraag.keuzes_json && (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-500 mb-2">Selecteer alle juiste uitspraken:</p>
+                {huidigeVraag.keuzes_json.map((keuze: any, i: number) => {
+                  const geselecteerd = gekozenAntwoord.split(',').includes(keuze.waarde)
+                  const juisteSet = huidigeVraag.juist_antwoord.split(',').map(s => s.trim())
+                  const isJuist = juisteSet.includes(keuze.waarde)
+                  let kn = 'border-gray-200 hover:border-indigo-400'
+                  if (antwoordStatus === 'feedback') {
+                    if (isJuist && geselecteerd) kn = 'border-green-400 bg-green-50'
+                    else if (isJuist && !geselecteerd) kn = 'border-yellow-400 bg-yellow-50'
+                    else if (!isJuist && geselecteerd) kn = 'border-red-400 bg-red-50'
+                  } else if (geselecteerd) kn = 'border-indigo-400 bg-indigo-50'
+                  return (
+                    <button key={i} onClick={() => {
+                      if (antwoordStatus !== 'kies') return
+                      const h = gekozenAntwoord.split(',').filter(s => s)
+                      setGekozenAntwoord(h.includes(keuze.waarde) ? h.filter(s => s !== keuze.waarde).join(',') : [...h, keuze.waarde].join(','))
+                    }} disabled={antwoordStatus !== 'kies'}
+                      className={`w-full text-left p-4 rounded-xl border-2 transition flex items-center gap-3 ${kn}`}>
+                      <span className={`w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center text-xs font-bold ${geselecteerd ? 'border-indigo-500 bg-indigo-500 text-white' : 'border-gray-300'}`}>{geselecteerd ? '✓' : ''}</span>
+                      <span dangerouslySetInnerHTML={{ __html: renderKatex(keuze.label) }} />
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
             {/* Toon juist antwoord na feedback */}
             {antwoordStatus === 'feedback' && (
               <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
