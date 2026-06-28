@@ -1,15 +1,21 @@
 import katex from 'katex'
 
-/** Render KaTeX string naar HTML — veilig voor dangerouslySetInnerHTML */
+/**
+ * Render KaTeX: herken $...$ en $$...$$, en auto-wrap losse wiskunde.
+ * Exponenten zoals a^m, x^2, 3x^2 worden automatisch herkend.
+ */
 export function renderKatex(tex: string): string {
   let html = tex
 
-  // Auto-wrap: als de tekst ^ of _ bevat maar geen $, wrap dan in $...$
-  if (!html.includes('$') && /[\^_]/.test(html)) {
-    html = `$${html}$`
+  // Auto-wrap: tekst met wiskundige patronen maar zonder $ → wrap in $
+  if (!html.includes('$')) {
+    const hasMath = /[\^_]|\\sqrt|\\frac|\\cdot|\\pi|\\infty|\\sum|\\int/.test(html)
+    if (hasMath) {
+      html = `$${html}$`
+    }
   }
 
-  // Vervang $$...$$ door display math
+  // $$...$$ → display math
   html = html.replace(/\$\$(.+?)\$\$/gs, (_: string, formula: string) => {
     try {
       return katex.renderToString(formula.trim(), { displayMode: true, throwOnError: false })
@@ -18,7 +24,7 @@ export function renderKatex(tex: string): string {
     }
   })
 
-  // Vervang $...$ door inline math
+  // $...$ → inline math
   html = html.replace(/\$(.+?)\$/g, (_: string, formula: string) => {
     try {
       return katex.renderToString(formula.trim(), { displayMode: false, throwOnError: false })
@@ -30,7 +36,6 @@ export function renderKatex(tex: string): string {
   return html
 }
 
-/** Formatteer seconden naar mm:ss */
 export function formatTijd(seconden: number): string {
   const m = Math.floor(seconden / 60)
   const s = seconden % 60

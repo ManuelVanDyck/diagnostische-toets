@@ -171,13 +171,14 @@ export default function GebiedBToets() {
         if (rpcErr) console.error('RPC error', sub, rpcErr)
         
         const { data: antw } = await supabase.from('antwoorden')
-          .select('id')
+          .select('id,is_correct')
           .eq('sessie_id', sessieId)
         const tot = antw?.length || 0
+        const correct = antw?.filter(a => a.is_correct).length || 0
 
         const { error: upsertErr } = await supabase.from('resultaten').upsert({
           sessie_id: sessieId, leerling_id: user.id, gebied: 'B', sub_gebied: sub,
-          beheersingsniveau: niveau || 0, aantal_vragen: tot, aantal_correct: 0
+          beheersingsniveau: niveau || 0, aantal_vragen: tot, aantal_correct: correct
         }, { onConflict: 'sessie_id,sub_gebied' })
         if (upsertErr) console.error('Upsert error', sub, upsertErr)
       } catch (e) {
