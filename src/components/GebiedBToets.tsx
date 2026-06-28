@@ -86,14 +86,16 @@ export default function GebiedBToets() {
 
     if (antwoordStatus !== 'feedback') return // veiligheid
 
-    // Check of laatste antwoord correct was
+    // Check of laatste antwoord correct was (via RPC)
     const { data: laatste } = await supabase
       .from('antwoorden')
       .select('is_correct')
       .eq('sessie_id', sessieId)
       .order('beantwoord_op', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
+
+    if (!laatste) { moveToNext(sub); return }
 
     if (laatste?.is_correct) {
       // Correct → markeer dit sub als klaar voor dit niveau
