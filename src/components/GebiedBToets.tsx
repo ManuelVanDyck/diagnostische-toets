@@ -170,14 +170,10 @@ export default function GebiedBToets() {
         })
         if (rpcErr) console.error('RPC error', sub, rpcErr)
         
-        const { data: antw, error: antwErr } = await supabase.from('antwoorden')
+        const { data: antw } = await supabase.from('antwoorden')
           .select('id')
           .eq('sessie_id', sessieId)
-        const tot = antw?.filter(a => {
-          // Filter client-side voor sub_gebied
-          return true // We kunnen niet server-side filteren op sub_gebied via REST
-        }).length || 0
-        const cor = antw?.filter(a => true).length || 0
+        const tot = antw?.length || 0
 
         const { error: upsertErr } = await supabase.from('resultaten').upsert({
           sessie_id: sessieId, leerling_id: user.id, gebied: 'B', sub_gebied: sub,
