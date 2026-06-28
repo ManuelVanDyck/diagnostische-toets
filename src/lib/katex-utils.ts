@@ -1,18 +1,24 @@
 import katex from 'katex'
 
 /**
- * Render KaTeX: herken $...$ en $$...$$, en auto-wrap losse wiskunde.
- * Exponenten zoals a^m, x^2, 3x^2 worden automatisch herkend.
+ * Render KaTeX. Herkent $...$, $$...$$, en auto-wrap losse exponenten/subscripts.
  */
 export function renderKatex(tex: string): string {
   let html = tex
 
-  // Auto-wrap: tekst met wiskundige patronen maar zonder $ → wrap in $
+  // Auto-wrap exponenten en subscripts die niet al in $ staan
   if (!html.includes('$')) {
-    const hasMath = /[\^_]|\\sqrt|\\frac|\\cdot|\\pi|\\infty|\\sum|\\int/.test(html)
-    if (hasMath) {
-      html = `$${html}$`
-    }
+    // Wrap ^ patroon: a^2, x^{10}, a^{-4}, (a+b)^2 etc.
+    html = html.replace(/([a-zA-Z0-9)])?\^(\{[^}]+\}|\-?[0-9a-zA-Z]+)/g, (match: string) => {
+      return `$${match}$`
+    })
+    // Wrap _ subscript
+    html = html.replace(/([a-zA-Z0-9)])?_(\{[^}]+\}|\-?[0-9a-zA-Z]+)/g, (match: string) => {
+      if (match.includes('$')) return match
+      return `$${match}$`
+    })
+    // Wrap \sqrt{...}
+    html = html.replace(/(\\sqrt\{[^}]+\})/g, (match: string) => `$${match}$`)
   }
 
   // $$...$$ → display math
