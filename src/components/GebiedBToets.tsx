@@ -239,6 +239,14 @@ export default function GebiedBToets() {
                 onKeyDown={e => e.key === 'Enter' && antwoordStatus === 'kies' && verstuurAntwoord()}
                 placeholder="Jouw antwoord..." className="w-full p-4 text-lg rounded-xl border-2 border-gray-200 focus:border-indigo-400 outline-none" autoFocus />
             )}
+
+            {/* Toon juist antwoord na feedback */}
+            {antwoordStatus === 'feedback' && (
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <span className="text-sm font-medium text-blue-700">Juiste antwoord: </span>
+                <span className="text-sm text-blue-800 font-mono" dangerouslySetInnerHTML={{ __html: renderKatex(huidigeVraag.juist_antwoord) }} />
+              </div>
+            )}
           </div>
         )}
 
