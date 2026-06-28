@@ -1,15 +1,13 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { renderKatex } from '../lib/katex-utils'
 import { SUBS } from './GebiedBIntro'
-import { GEBIED_FEEDBACK } from '../lib/feedback'
 
 interface Vraag { id: string; sub_gebied: string; niveau: number; type: string; vraag_html: string; keuzes_json: any; juist_antwoord: string; tolerantie: number | null; uitleg_html: string | null }
 
 export default function GebiedBToets() {
   const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
   const sessieId = searchParams.get('sessie')
 
   const [huidigeVraag, setHuidigeVraag] = useState<Vraag | null>(null)
@@ -24,7 +22,6 @@ export default function GebiedBToets() {
     machten: { actief: true, niveau: 1, foutOpNiveau: false, klaar: false },
     wortels: { actief: true, niveau: 1, foutOpNiveau: false, klaar: false },
   })
-  const [currentSubIdx, setCurrentSubIdx] = useState(0)
   const [currentLevel, setCurrentLevel] = useState(1)
   const [afgerond, setAfgerond] = useState(false)
 
@@ -33,7 +30,7 @@ export default function GebiedBToets() {
   // Laad eerste vraag
   useEffect(() => { if (sessieId) laadVraag(subKeys[0], 1) }, [sessieId])
 
-  const laadVraag = async (sub: string, niveau: number) => {
+  const laadVraag = async (sub: string, _niveau: number) => {
     setLoading(true)
     const { data: vraagId } = await supabase.rpc('volgende_vraag_sub', {
       p_sessie_id: sessieId, p_gebied: 'B', p_sub_gebied: sub
@@ -122,7 +119,6 @@ export default function GebiedBToets() {
     for (let i = fromIdx + 1; i < subKeys.length; i++) {
       const s = subState[subKeys[i]]
       if (s.actief && !s.klaar) {
-        setCurrentSubIdx(i)
         laadVraag(subKeys[i], s.niveau)
         return
       }
@@ -266,7 +262,7 @@ export default function GebiedBToets() {
 }
 
 // Resultaat component voor Gebied B
-function GebiedBResultaat({ sessieId, subState }: { sessieId: string, subState: any }) {
+function GebiedBResultaat({ sessieId }: { sessieId: string, subState?: any }) {
   const navigate = useNavigate()
   const [resultaten, setResultaten] = useState<any>(null)
   const NIVEAU_EMOJI = ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣']

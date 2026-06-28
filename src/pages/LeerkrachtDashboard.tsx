@@ -147,13 +147,13 @@ export default function LeerkrachtDashboard() {
     setTimeout(() => window.print(), 300)
   }
 
-  if (printModus) return <PrintOverzicht resultaten={gefilterd} klas={klasFilter} onClose={() => setPrintModus(false)} />
-
   // Filter
   const klassen = [...new Set(resultaten.map(r => r.klas))]
   const gefilterd = klasFilter
     ? resultaten.filter(r => r.klas === klasFilter)
     : resultaten
+
+  if (printModus) return <PrintOverzicht resultaten={gefilterd} klas={klasFilter} onClose={() => setPrintModus(false)} />
 
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen text-gray-500">Dashboard laden...</div>
