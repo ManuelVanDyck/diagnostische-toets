@@ -149,18 +149,21 @@ export default function GebiedBToets() {
     if (!user || !sessieId) return
 
     // Bereken niveau per sub en sla op
+    // Haal alle antwoorden met sub_gebied info op
+    const { data: alleAntw } = await supabase.from('antwoorden')
+      .select('id,is_correct, vragen!inner(sub_gebied)')
+      .eq('sessie_id', sessieId)
+
     for (const sub of subKeys) {
       try {
         const { data: niveau, error: rpcErr } = await supabase.rpc('bereken_niveau_sub', {
           p_sessie_id: sessieId, p_gebied: 'B', p_sub_gebied: sub
         })
         if (rpcErr) console.error('RPC error', sub, rpcErr)
-        
-        const { data: antw } = await supabase.from('antwoorden')
-          .select('id,is_correct')
-          .eq('sessie_id', sessieId)
-        const tot = antw?.length || 0
-        const correct = antw?.filter(a => a.is_correct).length || 0
+
+        const subAntw = alleAntw?.filter((a: any) => a.vragen?.sub_gebied === sub) || []
+        const tot = subAntw.length
+        const correct = subAntw.filter((a: any) => a.is_correct).length
 
         const { error: upsertErr } = await supabase.from('resultaten').upsert({
           sessie_id: sessieId, leerling_id: user.id, gebied: 'B', sub_gebied: sub,
@@ -303,35 +306,76 @@ export default function GebiedBToets() {
 function GebiedBResultaat({ sessieId }: { sessieId: string, subState?: any }) {
   const navigate = useNavigate()
   const [resultaten, setResultaten] = useState<any>(null)
-  const NIVEAU_EMOJI = ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣']
-  const NIVEAU_LABEL = ['Onvoldoende', 'Basis', 'Eenvoudig', 'Standaard', 'Analyse', 'Inzicht']
 
   useEffect(() => {
     supabase.from('resultaten').select('*').eq('sessie_id', sessieId).then(({ data }) => setResultaten(data))
   }, [])
+
+  const SUB_FEEDBACK: Record<string, Record<number, { kan: string; werk_aan: string }>> = {
+    eigenschappen: {
+      0: { kan: 'Je herkent nog geen eigenschappen.', werk_aan: 'Oefen commutativiteit, associativiteit en distributiviteit met eenvoudige voorbeelden.' },
+      1: { kan: 'Je herkent de basisbegrippen commutativiteit en associativiteit.', werk_aan: 'Leer ook de distributieve eigenschap en neutraal element herkennen.' },
+      2: { kan: 'Je past de distributieve eigenschap toe en herkent het neutraal element.', werk_aan: 'Werk aan symmetrische en opslorpende elementen.' },
+      3: { kan: 'Je bewijst dat bewerkingen niet-commutatief kunnen zijn.', werk_aan: 'Oefen met complexere combinaties van eigenschappen.' },
+      4: { kan: 'Je combineert meerdere eigenschappen in complexe opgaven.', werk_aan: 'Verdiep je in abstracte bewijsvoering met eigenschappen.' },
+      5: { kan: 'Je beheerst alle eigenschappen en past ze toe in onbekende situaties.', werk_aan: 'Blijf oefenen met open vragen en redeneringen.' },
+    },
+    volgorde: {
+      0: { kan: 'Je past de volgorde nog niet correct toe.', werk_aan: 'Leer HMWVDOA: Haakjes, Machten/Wortels, Vermenigvuldigen/Delen, Optellen/Aftrekken.' },
+      1: { kan: 'Je past de basisvolgorde toe (eerst vermenigvuldigen dan optellen).', werk_aan: 'Oefen met machten en haakjes in de volgorde.' },
+      2: { kan: 'Je past de volgorde toe met haakjes, vermenigvuldigen en optellen.', werk_aan: 'Voeg machten en wortels toe aan de volgorde-oefeningen.' },
+      3: { kan: 'Je combineert haakjes, machten, wortels in de juiste volgorde.', werk_aan: 'Werk aan complexere combinaties met negatieve getallen.' },
+      4: { kan: 'Je lost complexe volgorde-opgaven op met alle bewerkingen.', werk_aan: 'Oefen met opgaven waar meerdere haakjes en machten gecombineerd worden.' },
+      5: { kan: 'Je beheerst de volledige volgorde foutloos.', werk_aan: 'Blijf alert op valkuilen zoals -a^2 vs (-a)^2.' },
+    },
+    machten: {
+      0: { kan: 'Je kent de rekenregels voor machten nog niet.', werk_aan: 'Begin met a^m * a^n = a^(m+n) en a^0 = 1.' },
+      1: { kan: 'Je kent de basisregels: productregel en a^0.', werk_aan: 'Leer ook de quotientregel en macht van een macht.' },
+      2: { kan: 'Je past product- en quotientregel toe op eenvoudige machten.', werk_aan: 'Oefen met negatieve exponenten en macht van een macht.' },
+      3: { kan: 'Je werkt met negatieve exponenten en combineert meerdere regels.', werk_aan: 'Oefen met het vereenvoudigen van complexe machtsuitdrukkingen.' },
+      4: { kan: 'Je combineert alle machtsregels in complexe uitdrukkingen.', werk_aan: 'Werk aan opgaven met variabelen zoals (a^2)^3 * a^(-4).' },
+      5: { kan: 'Je beheerst alle machtsregels volledig.', werk_aan: 'Blijf oefenen met uitdagende combinaties van regels.' },
+    },
+    wortels: {
+      0: { kan: 'Je kent de rekenregels voor vierkantswortels nog niet.', werk_aan: 'Begin met sqrt(a)*sqrt(b)=sqrt(ab) en vereenvoudigen.' },
+      1: { kan: 'Je kent sqrt(81)=9 en herkent de productregel.', werk_aan: 'Leer wortels vereenvoudigen zoals sqrt(50)=5*sqrt(2).' },
+      2: { kan: 'Je vereenvoudigt eenvoudige wortels en past de productregel toe.', werk_aan: 'Oefen met optellen en aftrekken van gelijksoortige wortels.' },
+      3: { kan: 'Je combineert wortels in bewerkingen en vereenvoudigt correct.', werk_aan: 'Werk aan deling door wortels en het vereenvoudigen van breuken met wortels.' },
+      4: { kan: 'Je lost complexe opgaven met wortels op.', werk_aan: 'Oefen met opgaven die wortels combineren met machten en haakjes.' },
+      5: { kan: 'Je beheerst alle wortelregels volledig in complexe situaties.', werk_aan: 'Blijf oefenen met onbekende combinaties van wortels.' },
+    },
+  }
+
+  if (!resultaten) return <div className="min-h-screen flex items-center justify-center text-gray-500">Resultaten laden...</div>
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-xl mx-auto">
         <h1 className="text-2xl font-bold text-gray-800 mb-1">Jouw resultaat — Gebied B</h1>
         <p className="text-gray-500 mb-6">Bewerkingen & Rekenregels</p>
-
-        {resultaten && resultaten.map((r: any) => {
-          const subInfo = SUBS.find(s => s.key === r.sub_gebied)
+        {SUBS.map(subInfo => {
+          const r = resultaten.find((x: any) => x.sub_gebied === subInfo.key)
+          if (!r) return null
+          const fb = SUB_FEEDBACK[subInfo.key]?.[r.beheersingsniveau]
           return (
-            <div key={r.sub_gebied} className="bg-white rounded-xl shadow-sm p-4 mb-3">
+            <div key={subInfo.key} className="bg-white rounded-xl shadow-sm p-4 mb-3">
               <div className="flex justify-between items-center mb-2">
-                <span className="font-semibold text-gray-800">{subInfo?.icon} {subInfo?.naam}</span>
-                <span className="text-2xl">{NIVEAU_EMOJI[r.beheersingsniveau]}</span>
+                <span className="font-semibold text-gray-800">{subInfo.icon} {subInfo.naam}</span>
+                <span className={`text-2xl`}>{['🔴','🟠','🟡','🟢','🔵','🟣'][r.beheersingsniveau]}</span>
               </div>
-              <div className="flex justify-between text-sm text-gray-500">
-                <span>Niveau {r.beheersingsniveau}/5 — {NIVEAU_LABEL[r.beheersingsniveau]}</span>
+              <div className="flex justify-between text-sm text-gray-500 mb-3">
+                <span>Niveau {r.beheersingsniveau}/5</span>
                 <span>{r.aantal_correct}/{r.aantal_vragen} correct</span>
               </div>
+              {fb && (
+                <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm space-y-1">
+                  <p>✅ <span className="font-medium text-green-700">Wat je al kan:</span> {fb.kan}</p>
+                  <p>🎯 <span className="font-medium text-blue-700">Waar je nog aan kan werken:</span> {fb.werk_aan}</p>
+                </div>
+              )}
             </div>
           )
         })}
-
         <button onClick={() => navigate('/')} className="w-full mt-6 py-3 px-6 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition font-medium">
           Terug naar overzicht
         </button>
