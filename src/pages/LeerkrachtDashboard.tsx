@@ -169,23 +169,18 @@ export default function LeerkrachtDashboard() {
 
   // CSV export met feedback
   const exportCSV = () => {
-    const headers = ['Voornaam', 'Naam', 'Klas', 
-      ...GEBIEDEN.flatMap(g => [`${g} (niveau)`, `${g} (correct)`, `${g} (feedback)`]), 
-      'Gemiddeld']
-    const rows = gefilterd.map(lr => {
-      const gebiedenData = GEBIEDEN.flatMap(g => {
-        const d = lr.gebieden[g]
-        const fb = d ? GEBIED_FEEDBACK[g]?.[d.niveau] : null
-        return [
-          d?.niveau ?? '-',
-          d ? `${d.correct}/${d.totaal}` : '-',
-          fb ? fb.werk_aan.replace(/,/g, ' -') : '-'
-        ]
-      })
-      const niveaus = GEBIEDEN.map(g => lr.gebieden[g]?.niveau).filter(n => n !== undefined) as number[]
-      const gem = niveaus.length > 0 ? (niveaus.reduce((a,b) => a+b, 0) / niveaus.length).toFixed(1) : '-'
-      return [lr.voornaam, lr.naam, lr.klas, ...gebiedenData, gem]
-    })
+    const headers = ['Voornaam', 'Naam', 'Klas', 'Gebied', 'Sub-onderwerp', 'Niveau', 'Correct/Totaal', 'Feedback']
+    const rows: string[][] = []
+    for (const lr of gefilterd) {
+      for (const g of GEBIEDEN) {
+        const subs = lr.gebieden[g]
+        if (!subs || subs.length === 0) continue
+        for (const s of subs) {
+          const fb = s.sub_gebied ? SUB_FEEDBACK[s.sub_gebied]?.[s.niveau] : null
+          rows.push([lr.voornaam, lr.naam, lr.klas, g, s.sub_gebied || '-', String(s.niveau), `${s.correct}/${s.totaal}`, fb ? fb.werk_aan.replace(/,/g, ' -') : '-'])
+        }
+      }
+    }
     const csv = '\uFEFF' + [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -462,25 +457,27 @@ function PrintOverzicht({ resultaten, klas, onClose }: { resultaten: LeerlingRes
           </h2>
           <div className="grid grid-cols-1 gap-2 print:grid-cols-2 print:gap-1">
             {GEBIEDEN.map(g => {
-              const d = lr.gebieden[g]
-              if (!d) return null
-              const info = NIVEAU_INFO[d.niveau]
-              const fb = GEBIED_FEEDBACK[g]?.[d.niveau]
-              return (
-                <div key={g} className={`rounded-lg border p-2 text-xs ${info.bg} print:text-[9px] print:p-1`}>
-                  <div className="flex justify-between font-semibold mb-1">
-                    <span>{g}: {GEBIED_NAMEN[g]}</span>
-                    <span>Niv {info.label} ({d.correct}/{d.totaal})</span>
-                  </div>
-                  {fb && (
-                    <div className="space-y-0.5 text-[10px] print:text-[7px]">
-                      <div>✅ {fb.kan}</div>
-                      <div>📋 {fb.beheerst}</div>
-                      <div>🎯 {fb.werk_aan}</div>
+              const subs = lr.gebieden[g]
+              if (!subs || subs.length === 0) return null
+              return subs.map((s, i) => {
+                const info = NIVEAU_INFO[s.niveau] || NIVEAU_INFO[0]
+                const naam = s.sub_gebied ? (SUB_NAMEN[s.sub_gebied] || s.sub_gebied) : g
+                const fb = s.sub_gebied ? SUB_FEEDBACK[s.sub_gebied]?.[s.niveau] : null
+                return (
+                  <div key={`${g}-${i}`} className={`rounded-lg border p-2 text-xs ${info.bg} print:text-[9px] print:p-1`}>
+                    <div className="flex justify-between font-semibold mb-1">
+                      <span>{g}: {naam}</span>
+                      <span>Niv {s.niveau}/5 ({s.correct}/{s.totaal})</span>
                     </div>
-                  )}
-                </div>
-              )
+                    {fb && (
+                      <div className="space-y-0.5 text-[10px] print:text-[7px]">
+                        <div>✅ {fb.kan}</div>
+                        <div>🎯 {fb.werk_aan}</div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
             })}
           </div>
         </div>
