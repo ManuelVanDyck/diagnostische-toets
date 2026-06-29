@@ -20,12 +20,13 @@ const NIVEAU_INFO: Record<number, { kleur: string; label: string; bg: string }> 
   5: { kleur: '#4F46E5', label: '5', bg: 'bg-indigo-50 text-indigo-700' },
 }
 
+interface SubResultaat { niveau: number; correct: number; totaal: number; sub_gebied: string | null }
 interface LeerlingResultaat {
   leerling_id: string
   voornaam: string
   naam: string
   klas: string
-  gebieden: Record<string, { niveau: number; correct: number; totaal: number }>
+  gebieden: Record<string, SubResultaat[]>
 }
 
 export default function LeerkrachtDashboard() {
@@ -55,36 +56,48 @@ export default function LeerkrachtDashboard() {
       return navigate('/')
     }
 
-    // Haal alle resultaten op
+    // Haal alle resultaten op (apart van leerlingen)
     const { data: alleResultaten } = await supabase
       .from('resultaten')
-      .select(`
-        *,
-        leerlingen!inner(id, voornaam, naam, klas)
-      `)
+      .select('*')
       .order('gebied')
 
-    if (!alleResultaten) { setLoading(false); return }
+    // Haal alle leerlingen op
+    const { data: alleLeerlingen } = await supabase
+      .from('leerlingen')
+      .select('id, voornaam, naam, klas, rol')
+      .eq('rol', 'leerling')
+
+    if (!alleResultaten || !alleLeerlingen) { setLoading(false); return }
+
+    const leerlingMap = new Map<string, any>()
+    for (const l of alleLeerlingen) {
+      leerlingMap.set(l.id, l)
+    }
 
     // Groepeer per leerling
     const map = new Map<string, LeerlingResultaat>()
     for (const r of alleResultaten) {
-      const l = (r as any).leerlingen
+      const l = leerlingMap.get(r.leerling_id)
+      if (!l) continue
       if (!map.has(l.id)) {
         map.set(l.id, {
           leerling_id: l.id,
           voornaam: l.voornaam,
           naam: l.naam,
-          klas: l.klas,
+          klas: l.klas || '',
           gebieden: {}
         })
       }
       const entry = map.get(l.id)!
-      entry.gebieden[r.gebied] = {
+      const gebKey = r.sub_gebied ? `${r.gebied}_${r.sub_gebied}` : r.gebied
+      if (!entry.gebieden[gebKey]) entry.gebieden[gebKey] = []
+      entry.gebieden[gebKey].push({
         niveau: r.beheersingsniveau,
         correct: r.aantal_correct,
-        totaal: r.aantal_vragen
-      }
+        totaal: r.aantal_vragen,
+        sub_gebied: r.sub_gebied
+      })
     }
 
     setResultaten(Array.from(map.values()))
@@ -175,26 +188,27 @@ export default function LeerkrachtDashboard() {
           </h2>
           <p className="text-gray-500 mb-6">Klas {selectedLeerling.klas}</p>
 
-          {/* Per gebied met feedback */}
+          {/* Per gebied met sub-gebieden */}
           <div className="space-y-3 mb-6">
             {GEBIEDEN.map(g => {
-              const gData = selectedLeerling.gebieden[g]
-              if (!gData) return null
-              const info = NIVEAU_INFO[gData.niveau]
-              const fb = GEBIED_FEEDBACK[g]?.[gData.niveau]
+              const subs = selectedLeerling.gebieden[g]
+              if (!subs || subs.length === 0) return null
               return (
-                <div key={g} className={`rounded-xl border-2 p-4 ${info.bg}`}>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="font-semibold">{g}: {GEBIED_NAMEN[g]}</span>
-                    <span>Niveau {info.label} — {gData.correct}/{gData.totaal} correct</span>
+                <div key={g} className="bg-white rounded-xl border-2 border-gray-200 p-4">
+                  <h3 className="font-semibold text-gray-700 mb-2">{g}: {GEBIED_NAMEN[g]}</h3>
+                  <div className="grid grid-cols-1 gap-2">
+                    {subs.map((s, i) => {
+                      const info = NIVEAU_INFO[s.niveau] || NIVEAU_INFO[0]
+                      return (
+                        <div key={i} className={`rounded-lg border p-3 ${info.bg}`}>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-medium text-sm">{s.sub_gebied || 'Algemeen'}</span>
+                            <span className="text-sm">Niveau {s.niveau}/5 — {s.correct}/{s.totaal} correct</span>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
-                  {fb && (
-                    <div className="mt-2 pt-2 border-t border-gray-200/50 text-xs space-y-1">
-                      <p><span className="font-medium">✅ Kan:</span> {fb.kan}</p>
-                      <p><span className="font-medium">📋 Beheerst:</span> {fb.beheerst}</p>
-                      <p><span className="font-medium">🎯 Werk aan:</span> {fb.werk_aan}</p>
-                    </div>
-                  )}
                 </div>
               )
             })}
@@ -232,19 +246,16 @@ export default function LeerkrachtDashboard() {
   const gemiddelden: Record<string, number> = {}
   for (const g of GEBIEDEN) {
     const niveaus = gefilterd
-      .map(r => r.gebieden[g]?.niveau)
-      .filter(n => n !== undefined) as number[]
+      .flatMap(r => (r.gebieden[g] || []).map(s => s.niveau))
     gemiddelden[g] = niveaus.length > 0
       ? Math.round(niveaus.reduce((a, b) => a + b, 0) / niveaus.length * 10) / 10
       : 0
   }
 
-  // Leerlingen die hulp nodig hebben (niveau 0-1 op ≥2 gebieden)
+  // Leerlingen die hulp nodig hebben (niveau 0-1 op ≥2 sub-gebieden)
   const hulpNodig = gefilterd.filter(lr => {
-    const zwak = GEBIEDEN.filter(g => {
-      const n = lr.gebieden[g]?.niveau
-      return n !== undefined && n <= 1
-    })
+    const alleSubs = Object.values(lr.gebieden).flat()
+    const zwak = alleSubs.filter(s => s.niveau <= 1)
     return zwak.length >= 2
   })
 
@@ -331,10 +342,11 @@ export default function LeerkrachtDashboard() {
               </thead>
               <tbody>
                 {gefilterd.map(lr => {
-                  const niveaus = GEBIEDEN.map(g => lr.gebieden[g]?.niveau)
-                  const gem = niveaus
-                    .filter(n => n !== undefined)
-                    .reduce((a: number, b: any) => a + (b as number), 0) / niveaus.filter(n => n !== undefined).length
+                  // Gemiddelde over alle sub-resultaten
+                  const alleNiveaus = Object.values(lr.gebieden).flat().map(s => s.niveau)
+                  const gem = alleNiveaus.length > 0
+                    ? alleNiveaus.reduce((a: number, b: number) => a + b, 0) / alleNiveaus.length
+                    : NaN
                   return (
                     <tr
                       key={lr.leerling_id}
@@ -344,17 +356,16 @@ export default function LeerkrachtDashboard() {
                       <td className="p-3 font-medium text-gray-800">{lr.voornaam} {lr.naam}</td>
                       <td className="p-3 text-gray-500">{lr.klas}</td>
                       {GEBIEDEN.map(g => {
-                        const n = lr.gebieden[g]?.niveau
-                        const info = n !== undefined ? NIVEAU_INFO[n] : null
+                        const subs = lr.gebieden[g]
+                        if (!subs || subs.length === 0) return <td key={g} className="p-1 text-center"><span className="text-gray-300">-</span></td>
+                        // Toon gemiddelde van subs als er meerdere zijn, anders het enkele niveau
+                        const gemNiv = subs.length === 1 ? subs[0].niveau : Math.round(subs.reduce((a, s) => a + s.niveau, 0) / subs.length)
+                        const info = NIVEAU_INFO[gemNiv] || NIVEAU_INFO[0]
                         return (
                           <td key={g} className="p-1 text-center">
-                            {info ? (
-                              <span className={`inline-block w-8 h-8 rounded-lg text-xs font-bold flex items-center justify-center ${info.bg}`}>
-                                {info.label}
-                              </span>
-                            ) : (
-                              <span className="text-gray-300">-</span>
-                            )}
+                            <span className={`inline-block w-8 h-8 rounded-lg text-xs font-bold flex items-center justify-center ${info.bg}`} title={subs.map(s => `${s.sub_gebied}: ${s.niveau}`).join(', ')}>
+                              {info.label}
+                            </span>
                           </td>
                         )
                       })}
