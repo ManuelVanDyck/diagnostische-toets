@@ -77,22 +77,22 @@ export default function GebiedBToets() {
     await supabase.from('antwoorden').insert({
       sessie_id: sessieId, vraag_id: huidigeVraag.id, gebied: 'B',
       gegeven_antwoord: gekozenAntwoord, is_correct: isCorrect, stap: currentLevel
-    })\n    setLaatsteCorrect(isCorrect)\n    setAntwoordStatus('feedback')
+    })
+    setLaatsteCorrect(isCorrect)
+    setAntwoordStatus('feedback')
   }
 
   const volgendeVraag = async () => {
     if (!huidigeVraag) return
     const sub = huidigeVraag.sub_gebied
-    const wasFout = subState[sub].foutOpNiveau  // onthoud vóór state-update
+
+    if (antwoordStatus !== 'feedback') return
 
     if (laatsteCorrect) {
-      // Correct → markeer dit sub als klaar voor dit niveau
       setSubState(prev => ({ ...prev, [sub]: { ...prev[sub], klaar: true, foutOpNiveau: false } }))
       moveToNext(sub)
     } else {
-      // Fout
-      if (wasFout) {
-        // 2e fout → sub stopt, noteer niveau-1
+      if (subState[sub].foutOpNiveau) {
         const eindNiv = subState[sub].niveau - 1
         setSubState(prev => ({ ...prev, [sub]: { ...prev[sub], actief: false, klaar: true, niveau: Math.max(0, eindNiv) } }))
         moveToNext(sub)
