@@ -13,6 +13,7 @@ export default function GebiedBToets() {
   const [huidigeVraag, setHuidigeVraag] = useState<Vraag | null>(null)
   const [gekozenAntwoord, setGekozenAntwoord] = useState('')
   const [antwoordStatus, setAntwoordStatus] = useState<'kies' | 'feedback'>('kies')
+  const [laatsteCorrect, setLaatsteCorrect] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(true)
   
   // Sub-gebied tracking: per sub houden we bij: actief, huidig niveau, of er al een fout is op dit niveau
@@ -76,34 +77,21 @@ export default function GebiedBToets() {
     await supabase.from('antwoorden').insert({
       sessie_id: sessieId, vraag_id: huidigeVraag.id, gebied: 'B',
       gegeven_antwoord: gekozenAntwoord, is_correct: isCorrect, stap: currentLevel
-    })
-    setAntwoordStatus('feedback')
+    })\n    setLaatsteCorrect(isCorrect)\n    setAntwoordStatus('feedback')
   }
 
   const volgendeVraag = async () => {
     if (!huidigeVraag) return
     const sub = huidigeVraag.sub_gebied
+    const wasFout = subState[sub].foutOpNiveau  // onthoud vóór state-update
 
-    if (antwoordStatus !== 'feedback') return // veiligheid
-
-    // Check of laatste antwoord correct was (via RPC)
-    const { data: laatste } = await supabase
-      .from('antwoorden')
-      .select('is_correct')
-      .eq('sessie_id', sessieId)
-      .order('beantwoord_op', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (!laatste) { moveToNext(sub); return }
-
-    if (laatste?.is_correct) {
+    if (laatsteCorrect) {
       // Correct → markeer dit sub als klaar voor dit niveau
       setSubState(prev => ({ ...prev, [sub]: { ...prev[sub], klaar: true, foutOpNiveau: false } }))
       moveToNext(sub)
     } else {
       // Fout
-      if (subState[sub].foutOpNiveau) {
+      if (wasFout) {
         // 2e fout → sub stopt, noteer niveau-1
         const eindNiv = subState[sub].niveau - 1
         setSubState(prev => ({ ...prev, [sub]: { ...prev[sub], actief: false, klaar: true, niveau: Math.max(0, eindNiv) } }))
