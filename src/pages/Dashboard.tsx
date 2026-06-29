@@ -73,13 +73,27 @@ export default function Dashboard() {
   }
 
   const startToets = async (gebied: string) => {
+    const user = (await supabase.auth.getUser()).data.user
+    if (!user) return
+
     // Gebied B heeft een aparte sub-gebied flow
     if (gebied === 'B') {
+      const { data: afgerond } = await supabase
+        .from('toets_sessies')
+        .select('id')
+        .eq('leerling_id', user.id)
+        .eq('gebied', 'B')
+        .eq('status', 'afgerond')
+        .order('gestart_op', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (afgerond) {
+        navigate(`/toets/B?sessie=${afgerond.id}`)
+        return
+      }
       navigate('/gebied-b')
       return
     }
-    const user = (await supabase.auth.getUser()).data.user
-    if (!user) return
 
     // Check of er al een actieve sessie is
     const { data: bestaand } = await supabase
