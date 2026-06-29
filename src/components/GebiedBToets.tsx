@@ -28,8 +28,14 @@ export default function GebiedBToets() {
 
   const subKeys = ['eigenschappen', 'volgorde', 'machten', 'wortels']
 
-  // Laad eerste vraag
-  useEffect(() => { if (sessieId) laadVraag(subKeys[0], 1) }, [sessieId])
+  // Laad eerste vraag of check of sessie al afgerond is
+  useEffect(() => {
+    if (!sessieId) return
+    supabase.from('toets_sessies').select('status').eq('id', sessieId).single().then(({ data }) => {
+      if (data?.status === 'afgerond') setAfgerond(true)
+      else laadVraag(subKeys[0], 1)
+    })
+  }, [sessieId])
 
   const laadVraag = async (sub: string, _niveau: number) => {
     setLoading(true)
