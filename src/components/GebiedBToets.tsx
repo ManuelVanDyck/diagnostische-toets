@@ -149,10 +149,17 @@ export default function GebiedBToets() {
     if (!user || !sessieId) return
 
     // Bereken niveau per sub en sla op
-    // Haal alle antwoorden met sub_gebied info op
+    // Haal antwoorden en vragen apart op
     const { data: alleAntw } = await supabase.from('antwoorden')
-      .select('id,is_correct, vragen!inner(sub_gebied)')
+      .select('id,is_correct,vraag_id')
       .eq('sessie_id', sessieId)
+    const { data: alleVragen } = await supabase.from('vragen')
+      .select('id,sub_gebied')
+      .eq('gebied', 'B')
+    
+    // Maak een lookup: vraag_id → sub_gebied
+    const vraagSub: Record<string, string> = {}
+    if (alleVragen) for (const v of alleVragen) vraagSub[v.id] = v.sub_gebied
 
     for (const sub of subKeys) {
       try {
@@ -161,7 +168,7 @@ export default function GebiedBToets() {
         })
         if (rpcErr) console.error('RPC error', sub, rpcErr)
 
-        const subAntw = alleAntw?.filter((a: any) => a.vragen?.sub_gebied === sub) || []
+        const subAntw = (alleAntw || []).filter((a: any) => vraagSub[a.vraag_id] === sub)
         const tot = subAntw.length
         const correct = subAntw.filter((a: any) => a.is_correct).length
 
