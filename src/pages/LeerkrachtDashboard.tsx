@@ -131,7 +131,7 @@ export default function LeerkrachtDashboard() {
         })
       }
       const entry = map.get(l.id)!
-      const gebKey = r.sub_gebied ? `${r.gebied}_${r.sub_gebied}` : r.gebied
+      const gebKey = r.gebied
       if (!entry.gebieden[gebKey]) entry.gebieden[gebKey] = []
       entry.gebieden[gebKey].push({
         niveau: r.beheersingsniveau,
