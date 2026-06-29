@@ -2,13 +2,54 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { renderKatex } from '../lib/katex-utils'
-import { GEBIED_FEEDBACK } from '../lib/feedback'
 
 const GEBIEDEN = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
 const GEBIED_NAMEN: Record<string, string> = {
   A: 'Getallenkennis', B: 'Bewerkingen', C: 'Algebra',
   D: 'Vergelijkingen', E: 'Functies', F: 'Meetkunde',
   G: 'Goniometrie & Pythagoras'
+}
+
+const SUB_NAMEN: Record<string, string> = {
+  eigenschappen: '🔄 Eigenschappen van bewerkingen',
+  volgorde: '🔢 Volgorde van bewerkingen',
+  machten: '⬆️ Rekenen met machten',
+  wortels: '√ Rekenen met vierkantswortels',
+}
+
+const SUB_FEEDBACK: Record<string, Record<number, { kan: string; werk_aan: string }>> = {
+  eigenschappen: {
+    0: { kan: 'Je herkent nog geen eigenschappen.', werk_aan: 'Oefen commutativiteit, associativiteit en distributiviteit met eenvoudige voorbeelden.' },
+    1: { kan: 'Je herkent de basisbegrippen commutativiteit en associativiteit.', werk_aan: 'Leer ook de distributieve eigenschap en neutraal element herkennen.' },
+    2: { kan: 'Je past de distributieve eigenschap toe en herkent het neutraal element.', werk_aan: 'Werk aan symmetrische en opslorpende elementen.' },
+    3: { kan: 'Je bewijst dat bewerkingen niet-commutatief kunnen zijn.', werk_aan: 'Oefen met complexere combinaties van eigenschappen.' },
+    4: { kan: 'Je combineert meerdere eigenschappen in complexe opgaven.', werk_aan: 'Verdiep je in abstracte bewijsvoering met eigenschappen.' },
+    5: { kan: 'Je beheerst alle eigenschappen en past ze toe in onbekende situaties.', werk_aan: 'Blijf oefenen met open vragen en redeneringen.' },
+  },
+  volgorde: {
+    0: { kan: 'Je past de volgorde nog niet correct toe.', werk_aan: 'Leer HMWVDOA: Haakjes, Machten/Wortels, Vermenigvuldigen/Delen, Optellen/Aftrekken.' },
+    1: { kan: 'Je past de basisvolgorde toe (eerst vermenigvuldigen dan optellen).', werk_aan: 'Oefen met machten en haakjes in de volgorde.' },
+    2: { kan: 'Je past de volgorde toe met haakjes, vermenigvuldigen en optellen.', werk_aan: 'Voeg machten en wortels toe aan de volgorde-oefeningen.' },
+    3: { kan: 'Je combineert haakjes, machten, wortels in de juiste volgorde.', werk_aan: 'Werk aan complexere combinaties met negatieve getallen.' },
+    4: { kan: 'Je lost complexe volgorde-opgaven op met alle bewerkingen.', werk_aan: 'Oefen met opgaven waar meerdere haakjes en machten gecombineerd worden.' },
+    5: { kan: 'Je beheerst de volledige volgorde foutloos.', werk_aan: 'Blijf alert op valkuilen zoals -a^2 vs (-a)^2.' },
+  },
+  machten: {
+    0: { kan: 'Je kent de rekenregels voor machten nog niet.', werk_aan: 'Begin met a^m * a^n = a^(m+n) en a^0 = 1.' },
+    1: { kan: 'Je kent de basisregels: productregel en a^0.', werk_aan: 'Leer ook de quotientregel en macht van een macht.' },
+    2: { kan: 'Je past product- en quotientregel toe op eenvoudige machten.', werk_aan: 'Oefen met negatieve exponenten en macht van een macht.' },
+    3: { kan: 'Je werkt met negatieve exponenten en combineert meerdere regels.', werk_aan: 'Oefen met het vereenvoudigen van complexe machtsuitdrukkingen.' },
+    4: { kan: 'Je combineert alle machtsregels in complexe uitdrukkingen.', werk_aan: 'Werk aan opgaven met variabelen zoals (a^2)^3 * a^(-4).' },
+    5: { kan: 'Je beheerst alle machtsregels volledig.', werk_aan: 'Blijf oefenen met uitdagende combinaties van regels.' },
+  },
+  wortels: {
+    0: { kan: 'Je kent de rekenregels voor vierkantswortels nog niet.', werk_aan: 'Begin met sqrt(a)*sqrt(b)=sqrt(ab) en vereenvoudigen.' },
+    1: { kan: 'Je kent sqrt(81)=9 en herkent de productregel.', werk_aan: 'Leer wortels vereenvoudigen zoals sqrt(50)=5*sqrt(2).' },
+    2: { kan: 'Je vereenvoudigt eenvoudige wortels en past de productregel toe.', werk_aan: 'Oefen met optellen en aftrekken van gelijksoortige wortels.' },
+    3: { kan: 'Je combineert wortels in bewerkingen en vereenvoudigt correct.', werk_aan: 'Werk aan deling door wortels en het vereenvoudigen van breuken met wortels.' },
+    4: { kan: 'Je lost complexe opgaven met wortels op.', werk_aan: 'Oefen met opgaven die wortels combineren met machten en haakjes.' },
+    5: { kan: 'Je beheerst alle wortelregels volledig in complexe situaties.', werk_aan: 'Blijf oefenen met onbekende combinaties van wortels.' },
+  },
 }
 
 const NIVEAU_INFO: Record<number, { kleur: string; label: string; bg: string }> = {
@@ -188,23 +229,35 @@ export default function LeerkrachtDashboard() {
           </h2>
           <p className="text-gray-500 mb-6">Klas {selectedLeerling.klas}</p>
 
-          {/* Per gebied met sub-gebieden */}
+          {/* Per gebied met sub-gebieden + feedback */}
           <div className="space-y-3 mb-6">
             {GEBIEDEN.map(g => {
               const subs = selectedLeerling.gebieden[g]
               if (!subs || subs.length === 0) return null
               return (
                 <div key={g} className="bg-white rounded-xl border-2 border-gray-200 p-4">
-                  <h3 className="font-semibold text-gray-700 mb-2">{g}: {GEBIED_NAMEN[g]}</h3>
-                  <div className="grid grid-cols-1 gap-2">
+                  <h3 className="font-semibold text-gray-700 mb-3">{g}: {GEBIED_NAMEN[g]}</h3>
+                  <div className="space-y-2">
                     {subs.map((s, i) => {
                       const info = NIVEAU_INFO[s.niveau] || NIVEAU_INFO[0]
+                      const naam = s.sub_gebied ? (SUB_NAMEN[s.sub_gebied] || s.sub_gebied) : 'Algemeen'
+                      const fb = s.sub_gebied ? SUB_FEEDBACK[s.sub_gebied]?.[s.niveau] : null
                       return (
                         <div key={i} className={`rounded-lg border p-3 ${info.bg}`}>
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="font-medium text-sm">{s.sub_gebied || 'Algemeen'}</span>
-                            <span className="text-sm">Niveau {s.niveau}/5 — {s.correct}/{s.totaal} correct</span>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-medium text-sm">{naam}</span>
+                            <span className="text-2xl">{['🔴','🟠','🟡','🟢','🔵','🟣'][s.niveau]}</span>
                           </div>
+                          <div className="flex justify-between text-sm text-gray-600 mb-2">
+                            <span>Niveau {s.niveau}/5</span>
+                            <span>{s.correct}/{s.totaal} correct</span>
+                          </div>
+                          {fb && (
+                            <div className="bg-white/60 rounded-lg p-2 text-sm space-y-1 mt-2">
+                              <p>✅ <span className="font-medium">Wat de leerling al kan:</span> {fb.kan}</p>
+                              <p>🎯 <span className="font-medium">Waar nog aan gewerkt moet worden:</span> {fb.werk_aan}</p>
+                            </div>
+                          )}
                         </div>
                       )
                     })}
